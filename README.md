@@ -1,6 +1,9 @@
 # Diabetic Retinopathy Screening Dashboard
 
-A web application for automated diabetic retinopathy (DR) screening using deep learning. Upload retinal images to receive a diagnosis, confidence score, and lesion heatmap visualization. Results can be exported as CSV and are sorted by severity.
+A web application for automated diabetic retinopathy (DR) screening using deep learning. Upload retinal images to receive a diagnosis, confidence score, and lesion heatmap visualization. Results can be exported as CSV and are sorted by severity.  
+
+> ⚠️ **Note:** The current model is only for testing (trained for ~10 epochs), so the results are not very accurate yet.
+
 
 ## Features
 - Upload one or more retinal images for DR diagnosis
