@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diabetic Retinopathy Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Diabetic Retinopathy Screening</h1>
+        <div class="upload-area">
+            <input type="file" id="imageInput" accept="image/*" multiple>
+            <button id="diagnoseButton">Diagnose</button>
+        </div>
+        
+        <div class="legend">
+            <span class="legend-box no-dr"></span> No DR
+            <span class="legend-box mild-moderate"></span> Mild/Moderate
+            <span class="legend-box severe-proliferative"></span> Severe/Proliferative
+        </div>
+
+        <div id="loading" class="hidden">
+            <p>Diagnosing... Please wait.</p>
+        </div>
+        
+        <div id="results-controls" class="hidden">
+            <button id="downloadCSV">Export to CSV</button>
+            <p>Results sorted by severity (highest risk first).</p>
+        </div>
+
+        <div id="results" class="hidden">
+            </div>
+        
+        <div id="error" class="hidden">
+            <p>An error occurred. Please try again.</p>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
