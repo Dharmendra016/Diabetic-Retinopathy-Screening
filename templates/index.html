@@ -3,40 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diabetic Retinopathy Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>DR Screening Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Arial', sans-serif; }
+        .container { max-width: 1200px; }
+        .card { margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .triage-green { background-color: #d4edda; color: #155724; }
+        .triage-yellow { background-color: #fff3cd; color: #856404; }
+        .triage-red { background-color: #f8d7da; color: #721c24; }
+        #resultsTable th { cursor: pointer; }
+        .heatmap-img { max-width: 200px; margin-top: 10px; border: 1px solid #ddd; }
+        .btn-primary { background-color: #007bff; border-color: #007bff; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .table { border-radius: 8px; overflow: hidden; }
+        .header { background: linear-gradient(45deg, #007bff, #00d4ff); color: white; padding: 20px; border-radius: 10px; }
+        .error-row { background-color: #f2dede; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Diabetic Retinopathy Screening</h1>
-        <div class="upload-area">
-            <input type="file" id="imageInput" accept="image/*" multiple>
-            <button id="diagnoseButton">Diagnose</button>
+    <div class="container mt-5">
+        <div class="header text-center mb-4">
+            <h1>Diabetic Retinopathy Screening Dashboard</h1>
+            <p>Upload retinal fundus images for AI-assisted diagnosis</p>
         </div>
         
-        <div class="legend">
-            <span class="legend-box no-dr"></span> No DR
-            <span class="legend-box mild-moderate"></span> Mild/Moderate
-            <span class="legend-box severe-proliferative"></span> Severe/Proliferative
-        </div>
-
-        <div id="loading" class="hidden">
-            <p>Diagnosing... Please wait.</p>
-        </div>
-        
-        <div id="results-controls" class="hidden">
-            <button id="downloadCSV">Export to CSV</button>
-            <p>Results sorted by severity (highest risk first).</p>
-        </div>
-
-        <div id="results" class="hidden">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Upload Retinal Images</h5>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <input type="file" name="files[]" id="files" multiple accept="image/*" class="form-control mb-3">
+                    <button type="submit" class="btn btn-primary">Upload and Analyze</button>
+                </form>
             </div>
-        
-        <div id="error" class="hidden">
-            <p>An error occurred. Please try again.</p>
+        </div>
+
+        <div id="results" class="mt-4">
+            <h3>Analysis Results</h3>
+            <table class="table table-striped" id="resultsTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)">Filename <span>&uarr;&darr;</span></th>
+                        <th onclick="sortTable(1)">Severity <span>&uarr;&darr;</span></th>
+                        <th onclick="sortTable(2)">Confidence <span>&uarr;&darr;</span></th>
+                        <th>Triage</th>
+                        <th>Explainability (Heatmap)</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+            <button id="exportCsv" class="btn btn-success me-2">Export CSV</button>
+            <button id="exportPdf" class="btn btn-danger">Export PDF</button>
         </div>
     </div>
-    
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let resultsData = [];
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            const files = document.getElementById('files').files;
+            for (let file of files) {
+                formData.append('files[]', file);
+            }
+            try {
+                const response = await fetch('/api/diagnose', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (err) {
+                alert(`Network error: ${err.message}`);
+            }
+        });
+
+        function displayResults(data) {
+            resultsData = data;
+            const tbody = document.getElementById('resultsBody');
+            tbody.innerHTML = '';
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                if ('error' in item) {
+                    row.classList.add('error-row');
+                    row.innerHTML = `
+                        <td>${item.filename}</td>
+                        <td colspan="4">Error: ${item.error}</td>
+                    `;
+                } else {
+                    row.classList.add(`triage-${item.color}`);
+                    row.innerHTML = `
+                        <td>${item.filename}</td>
+                        <td>${item.prediction}</td>
+                        <td>${(item.confidence * 100).toFixed(2)}%</td>
+                        <td>${item.color.toUpperCase()}</td>
+                        <td><img src="data:image/jpeg;base64,${item.heatmap}" class="heatmap-img" alt="Heatmap"></td>
+                    `;
+                }
+                tbody.appendChild(row);
+            });
+        }
+
+        function sortTable(col) {
+            resultsData.sort((a, b) => {
+                let valA = getColValue(a, col);
+                let valB = getColValue(b, col);
+                return valA > valB ? 1 : valA < valB ? -1 : 0;
+            });
+            displayResults(resultsData);
+        }
+
+        function getColValue(item, col) {
+            if ('error' in item) return '';
+            if (col === 0) return item.filename.toLowerCase();
+            if (col === 1) return ['No DR', 'Mild', 'Moderate', 'Severe', 'Proliferative'].indexOf(item.prediction);
+            if (col === 2) return item.confidence || 0;
+            return item.color || '';
+        }
+
+        document.getElementById('exportCsv').addEventListener('click', async () => {
+            try {
+                const response = await fetch('/export_csv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: resultsData })
+                });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'dr_report.csv';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const data = await response.json();
+                    alert(`Export failed: ${data.error}`);
+                }
+            } catch (err) {
+                alert(`Export error: ${err.message}`);
+            }
+        });
+
+        document.getElementById('exportPdf').addEventListener('click', async () => {
+            try {
+                const response = await fetch('/export_pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: resultsData })
+                });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'dr_report.pdf';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const data = await response.json();
+                    alert(`Export failed: ${data.error}`);
+                }
+            } catch (err) {
+                alert(`Export error: ${err.message}`);
+            }
+        });
+    </script>
 </body>
 </html>
