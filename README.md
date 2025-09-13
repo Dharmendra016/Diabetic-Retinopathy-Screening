@@ -25,6 +25,7 @@ cd Diabetic-Retinopathy-Screening
 ### 2. Create and Activate Virtual Environment (Recommended)
 **Windows (PowerShell):**
 ```sh
+// Install python 3.10 version if already not installed
 py -3.10 -m venv dr_app_venv
 dr_app_venv/Scripts/activate
 or
