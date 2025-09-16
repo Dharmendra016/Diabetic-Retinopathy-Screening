@@ -1,176 +1,221 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DR Screening Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f8f9fa; font-family: 'Arial', sans-serif; }
-        .container { max-width: 1200px; }
-        .card { margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        .triage-green { background-color: #d4edda; color: #155724; }
-        .triage-yellow { background-color: #fff3cd; color: #856404; }
-        .triage-red { background-color: #f8d7da; color: #721c24; }
-        #resultsTable th { cursor: pointer; }
-        .heatmap-img { max-width: 200px; margin-top: 10px; border: 1px solid #ddd; }
-        .btn-primary { background-color: #007bff; border-color: #007bff; }
-        .btn-primary:hover { background-color: #0056b3; }
-        .table { border-radius: 8px; overflow: hidden; }
-        .header { background: linear-gradient(45deg, #007bff, #00d4ff); color: white; padding: 20px; border-radius: 10px; }
-        .error-row { background-color: #f2dede; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Unified AI-Assisted Screening Dashboard - Diabetic Retinopathy Detection</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="container mt-5">
-        <div class="header text-center mb-4">
-            <h1>Diabetic Retinopathy Screening Dashboard</h1>
-            <p>Upload retinal fundus images for AI-assisted diagnosis</p>
-        </div>
-        
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Upload Retinal Images</h5>
-                <form id="uploadForm" enctype="multipart/form-data">
-                    <input type="file" name="files[]" id="files" multiple accept="image/*" class="form-control mb-3">
-                    <button type="submit" class="btn btn-primary">Upload and Analyze</button>
-                </form>
-            </div>
-        </div>
-
-        <div id="results" class="mt-4">
-            <h3>Analysis Results</h3>
-            <table class="table table-striped" id="resultsTable">
-                <thead>
-                    <tr>
-                        <th onclick="sortTable(0)">Filename <span>&uarr;&darr;</span></th>
-                        <th onclick="sortTable(1)">Severity <span>&uarr;&darr;</span></th>
-                        <th onclick="sortTable(2)">Confidence <span>&uarr;&darr;</span></th>
-                        <th>Triage</th>
-                        <th>Explainability (Heatmap)</th>
-                    </tr>
-                </thead>
-                <tbody id="resultsBody"></tbody>
-            </table>
-            <button id="exportCsv" class="btn btn-success me-2">Export CSV</button>
-            <button id="exportPdf" class="btn btn-danger">Export PDF</button>
-        </div>
+  <div class="background-pattern"></div>
+  <div class="container">
+    <div class="header-section">
+      <div class="header-icon">
+        <i class="fas fa-eye"></i>
+      </div>
+      <h1>AI-Assisted Diabetic Retinopathy Screening</h1>
+      <p class="subtitle">Advanced MobileNetV3 + Grad-CAM Technology</p>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        let resultsData = [];
+    <div class="upload-section">
+      <form method="POST" enctype="multipart/form-data" id="uploadForm">
+        <div class="upload-box">
+          <div class="upload-icon">
+            <i class="fas fa-cloud-upload-alt"></i>
+          </div>
+          <h3>Upload Retinal Images</h3>
+          <p>Select multiple images for batch analysis</p>
+          <input type="file" name="images[]" accept="image/*" multiple id="fileInput">
+          <label for="fileInput" class="file-label">
+            <i class="fas fa-images"></i>
+            Choose Images
+          </label>
+          <div class="file-info" id="fileInfo"></div>
+          <button type="submit" class="analyze-btn">
+            <i class="fas fa-search"></i>
+            Analyze & Diagnose
+          </button>
+        </div>
+      </form>
+    </div>
 
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData();
-            const files = document.getElementById('files').files;
-            for (let file of files) {
-                formData.append('files[]', file);
-            }
-            try {
-                const response = await fetch('/api/diagnose', { method: 'POST', body: formData });
-                const data = await response.json();
-                if (response.ok) {
-                    displayResults(data);
-                } else {
-                    alert(`Error: ${data.error}`);
-                }
-            } catch (err) {
-                alert(`Network error: ${err.message}`);
-            }
-        });
+    <div id="loading" class="loading">
+      <div class="loader-spinner"></div>
+      <div class="loading-text">
+        <h3>Analyzing Images...</h3>
+        <p>AI is processing your retinal images</p>
+      </div>
+    </div>
 
-        function displayResults(data) {
-            resultsData = data;
-            const tbody = document.getElementById('resultsBody');
-            tbody.innerHTML = '';
-            data.forEach(item => {
-                const row = document.createElement('tr');
-                if ('error' in item) {
-                    row.classList.add('error-row');
-                    row.innerHTML = `
-                        <td>${item.filename}</td>
-                        <td colspan="4">Error: ${item.error}</td>
-                    `;
-                } else {
-                    row.classList.add(`triage-${item.color}`);
-                    row.innerHTML = `
-                        <td>${item.filename}</td>
-                        <td>${item.prediction}</td>
-                        <td>${(item.confidence * 100).toFixed(2)}%</td>
-                        <td>${item.color.toUpperCase()}</td>
-                        <td><img src="data:image/jpeg;base64,${item.heatmap}" class="heatmap-img" alt="Heatmap"></td>
-                    `;
-                }
-                tbody.appendChild(row);
-            });
-        }
+    {% if results %}
+      <div class="results-section">
+        <div class="results-header">
+          <h2><i class="fas fa-chart-line"></i> Diagnostic Results</h2>
+          <a href="{{ url_for('clear_results') }}" class="clear-button">
+            <i class="fas fa-trash"></i>
+            Clear Results
+          </a>
+        </div>
+        
+        <div class="table-container">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th><i class="fas fa-image"></i> Original Image</th>
+                <th><i class="fas fa-diagnoses"></i> Diagnosis</th>
+                <th><i class="fas fa-percentage"></i> Confidence</th>
+                <th><i class="fas fa-fire"></i> Stage 1 Grad-CAM</th>
+                <th><i class="fas fa-fire"></i> Stage 2 Grad-CAM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for res in results %}
+              <tr class="result-row {% if res.severity_idx == 0 %}severity-none{% elif res.severity_idx <= 2 %}severity-mild{% else %}severity-severe{% endif %}">
+                <td>
+                  <div class="image-container">
+                    <img src="{{ url_for('static', filename='uploads/' + res.image_path) }}" class="result-image clickable" alt="Original Image">
+                    <div class="image-overlay">
+                      <i class="fas fa-expand"></i>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="diagnosis-info">
+                    <span class="diagnosis-text">{{ res.prediction }}</span>
+                    <div class="severity-indicator">
+                      {% if res.severity_idx == 0 %}
+                        <span class="severity-badge severity-none">No DR</span>
+                      {% elif res.severity_idx <= 2 %}
+                        <span class="severity-badge severity-mild">Mild-Moderate</span>
+                      {% else %}
+                        <span class="severity-badge severity-severe">Severe</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="confidence-container">
+                    <div class="confidence-value">{{ res.confidence_percent }}%</div>
+                    <div class="confidence-bar">
+                      <div class="confidence-fill" style="width: {{ res.confidence_percent }}%"></div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="image-container">
+                    <img src="{{ url_for('static', filename='uploads/' + res.heatmap1) }}" class="result-image clickable" alt="Stage 1 Grad-CAM">
+                    <div class="image-overlay">
+                      <i class="fas fa-expand"></i>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  {% if res.heatmap2 %}
+                  <div class="image-container">
+                    <img src="{{ url_for('static', filename='uploads/' + res.heatmap2) }}" class="result-image clickable" alt="Stage 2 Grad-CAM">
+                    <div class="image-overlay">
+                      <i class="fas fa-expand"></i>
+                    </div>
+                  </div>
+                  {% else %}
+                  <div class="not-available">
+                    <i class="fas fa-minus-circle"></i>
+                    <span>N/A</span>
+                  </div>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
 
-        function sortTable(col) {
-            resultsData.sort((a, b) => {
-                let valA = getColValue(a, col);
-                let valB = getColValue(b, col);
-                return valA > valB ? 1 : valA < valB ? -1 : 0;
-            });
-            displayResults(resultsData);
-        }
+        <div class="export-section">
+          <h3><i class="fas fa-download"></i> Export Reports</h3>
+          <div class="export-options">
+            <a href="{{ url_for('export_csv') }}" class="export-btn csv-btn">
+              <i class="fas fa-file-csv"></i>
+              <span>Export CSV</span>
+            </a>
+            <a href="{{ url_for('export_pdf') }}" class="export-btn pdf-btn">
+              <i class="fas fa-file-pdf"></i>
+              <span>Export PDF</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
 
-        function getColValue(item, col) {
-            if ('error' in item) return '';
-            if (col === 0) return item.filename.toLowerCase();
-            if (col === 1) return ['No DR', 'Mild', 'Moderate', 'Severe', 'Proliferative'].indexOf(item.prediction);
-            if (col === 2) return item.confidence || 0;
-            return item.color || '';
-        }
+  <!-- Modal for larger image -->
+  <div id="modal" class="modal">
+    <span class="close">&times;</span>
+    <img class="modal-content" id="modalImg">
+    <div class="modal-caption" id="modalCaption"></div>
+  </div>
 
-        document.getElementById('exportCsv').addEventListener('click', async () => {
-            try {
-                const response = await fetch('/export_csv', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: resultsData })
-                });
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'dr_report.csv';
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                } else {
-                    const data = await response.json();
-                    alert(`Export failed: ${data.error}`);
-                }
-            } catch (err) {
-                alert(`Export error: ${err.message}`);
-            }
-        });
+  <script>
+    // File input handler
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const fileInfo = document.getElementById('fileInfo');
+      const files = e.target.files;
+      
+      if (files.length > 0) {
+        fileInfo.style.display = 'block';
+        fileInfo.innerHTML = `<i class="fas fa-check-circle"></i> ${files.length} file(s) selected`;
+      } else {
+        fileInfo.style.display = 'none';
+      }
+    });
 
-        document.getElementById('exportPdf').addEventListener('click', async () => {
-            try {
-                const response = await fetch('/export_pdf', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: resultsData })
-                });
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'dr_report.pdf';
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                } else {
-                    const data = await response.json();
-                    alert(`Export failed: ${data.error}`);
-                }
-            } catch (err) {
-                alert(`Export error: ${err.message}`);
-            }
-        });
-    </script>
+    // Loader
+    document.getElementById('uploadForm').addEventListener('submit', function() {
+      console.log('Form submitted, showing loader');
+      document.getElementById('loading').style.display = 'flex';
+    });
+
+    // Modal for images
+    const modal = document.getElementById('modal');
+    const modalImg = document.getElementById('modalImg');
+    const modalCaption = document.getElementById('modalCaption');
+    const closeBtn = document.getElementsByClassName('close')[0];
+    const imgs = document.querySelectorAll('.result-image.clickable');
+
+    console.log('Found clickable images:', imgs.length);
+
+    imgs.forEach(function(img, index) {
+      img.addEventListener('click', function() {
+        console.log('Image clicked:', index, this.src);
+        modal.style.display = 'block';
+        modalImg.src = this.src;
+        modalCaption.textContent = this.alt || 'Medical Image';
+      });
+    });
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function() {
+        console.log('Close button clicked');
+        modal.style.display = 'none';
+      });
+    } else {
+      console.error('Close button not found');
+    }
+
+    window.addEventListener('click', function(event) {
+      if (event.target === modal) {
+        console.log('Clicked outside modal');
+        modal.style.display = 'none';
+      }
+    });
+
+    // Add smooth scrolling to results
+    if (document.querySelector('.results-section')) {
+      console.log('Scrolling to results section');
+      document.querySelector('.results-section').scrollIntoView({
+        behavior: 'smooth'
+      });
+    }
+  </script>
 </body>
 </html>
